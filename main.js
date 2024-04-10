@@ -1,1 +1,1 @@
-console.log("hello, world")
+console.log(normalizeURL("https://blog.boot.dev/path/"));
