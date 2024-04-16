@@ -1,12 +1,40 @@
 const { JSDOM } = require("jsdom");
 
-function normalizeURL(url) {
-  const urlObj = new URL(url);
-  let fullPath = `${urlObj.hostname}${urlObj.pathname}`;
-  if (fullPath.length > 0 && fullPath.slice(-1) === "/") {
-    fullPath = fullPath.slice(0, -1);
+async function crawlPage(baseURL, currentURL, pages) {
+  const baseURLObj = new URL(baseURL);
+  const currentURLObj = new URL(currentURL);
+  if (baseURLObj.hostname !== currentURLObj.hostname) {
+    return pages;
   }
-  return fullPath;
+
+  const normalizedURL = normalizeURL(currentURL);
+  if (pages[normalizedURL] > 0) {
+    pages[normalizedURL]++;
+    return pages;
+  }
+  pages[normalizedURL] = 1;
+
+  try {
+    console.log(`crawling of ${currentURL}...`);
+    const response = await fetch(currentURL);
+    if (response.status >= 400) {
+      console.log(`Got HTTP error, status code: ${response.status}`);
+      return pages;
+    }
+    const contentType = response.headers.get("content-type");
+    if (!contentType.includes("text/html")) {
+      console.log("Response is not a text/html data.");
+      return pages;
+    }
+    const htmlBody = await response.text();
+    const urls = getURLsFromHTML(htmlBody, baseURL);
+    for (const url of urls) {
+      pages = await crawlPage(baseURL, url, pages);
+    }
+    return pages;
+  } catch (err) {
+    console.log(err.message);
+  }
 }
 
 function getURLsFromHTML(htmlBody, baseURL) {
@@ -31,7 +59,17 @@ function getURLsFromHTML(htmlBody, baseURL) {
   return urls;
 }
 
+function normalizeURL(url) {
+  const urlObj = new URL(url);
+  let fullPath = `${urlObj.host}${urlObj.pathname}`;
+  if (fullPath.length > 0 && fullPath.slice(-1) === "/") {
+    fullPath = fullPath.slice(0, -1);
+  }
+  return fullPath;
+}
+
 module.exports = {
   normalizeURL,
   getURLsFromHTML,
+  crawlPage,
 };
